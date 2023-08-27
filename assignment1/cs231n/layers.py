@@ -27,7 +27,13 @@ def affine_forward(x, w, b):
     # will need to reshape the input into rows.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    
+    
+    x_rs = x.reshape(x.shape[0],-1)
+    w_rs = w.reshape(x_rs.shape[1],-1)
+    # print(x_rs.shape)
+    # print(w_rs.shape)
+    out = np.matmul(x_rs,w_rs) + b
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -60,14 +66,24 @@ def affine_backward(dout, cache):
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    x_rs = x.reshape(x.shape[0],-1)
+    
+    dx = (dout @ w.T).reshape(x.shape[0], *x.shape[1:])
+    # dx = (np.dot(dout,w.T)).reshape(x.shape[0], *x.shape[1:])
+    dw = np.dot(x_rs.T,dout) #differntiate wx+b wrt w,take x transpose
+    db = dout.sum(axis=0) #same gradient just shaping to b's dimesions
+
+
 
     pass
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
     return dx, dw, db
+
 
 
 def relu_forward(x):
@@ -86,7 +102,7 @@ def relu_forward(x):
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    out = np.maximum(0,x)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -113,7 +129,8 @@ def relu_backward(dout, cache):
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+  
+    dx = dout * (x>0) #apply reLU filter over dout
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -766,14 +783,31 @@ def svm_loss(x, y):
     - loss: Scalar giving the loss
     - dx: Gradient of the loss with respect to x
     """
+    
+
     loss, dx = None, None
 
     ###########################################################################
     # TODO: Copy over your solution from A1.
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    score_mat = x
+    #print(score_mat.shape)
+    correct_mat = np.choose(y,score_mat.T)
+    raw_diffs = score_mat.T-correct_mat+1
+    raw_diffs[raw_diffs==1] = 0
+    raw_diffs[raw_diffs<0] = 0
+    #print(raw_diffs[:,10])
+    loss = np.sum(raw_diffs)/x.shape[0]
     pass
+
+    gt_z_mat = (raw_diffs>0).astype(float)
+    gt_z_per_img = np.sum(gt_z_mat,axis=0)
+    
+    back = gt_z_mat.T
+    back[range(0,x.shape[0]),y] = -gt_z_per_img
+    
+    dx = back/x.shape[0]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -802,7 +836,26 @@ def softmax_loss(x, y):
     # TODO: Copy over your solution from A1.
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    scores = x
+    scores -= np.max(scores)
+    #print(x.shape)
+    exp_scores = np.exp(scores)
+    #print(y)
+    correct = np.choose(y,exp_scores.T)
+    sums = np.sum(exp_scores,axis=1)
+    loss = np.sum(-np.log(correct/sums))
 
+    norm_exp = (exp_scores.T/sums)
+    norm_exp = norm_exp.T
+    norm_exp[range(0,x.shape[0]),y] = (correct/sums)-1
+    #print(norm_exp.shape)
+    dx = norm_exp
+
+    #print(dW.shape)
+
+
+    loss = loss/x.shape[0]
+    dx = dx/x.shape[0]
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

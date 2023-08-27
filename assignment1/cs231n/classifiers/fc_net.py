@@ -53,8 +53,12 @@ class TwoLayerNet(object):
         # and biases using the keys 'W1' and 'b1' and second layer                 #
         # weights and biases using the keys 'W2' and 'b2'.                         #
         ############################################################################
-        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        #*****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        self.params['W1'] = np.random.normal(loc=0.0, scale=weight_scale, size=(input_dim,hidden_dim))
+        self.params['b1'] = np.zeros(hidden_dim)
+        self.params['W2'] = np.random.normal(loc=0.0, scale=weight_scale, size=(hidden_dim,num_classes))
+        self.params['b2'] = np.zeros(num_classes)
+        
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -82,12 +86,22 @@ class TwoLayerNet(object):
           names to gradients of the loss with respect to those parameters.
         """
         scores = None
+        
         ############################################################################
         # TODO: Implement the forward pass for the two-layer net, computing the    #
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        W1, b1, W2, b2 = self.params.values()
 
+        #layer 1a affine
+        o1,c1 = affine_forward(X,W1,b1)
+        #layer 1b ReLU
+        o2,c2 = relu_forward(o1)
+        #layer 2a affine
+        o3,c3 = affine_forward(o2,W2,b2)
+
+        scores = o3
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -111,7 +125,18 @@ class TwoLayerNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        loss, dout_l = softmax_loss(scores,y)
+        loss = loss + 0.5 * self.reg * (np.sum(W1*W1)+np.sum(W2*W2))
+        
+        dout3, dW2, db2 = affine_backward(dout_l,c3)
+        dout2 = relu_backward(dout3,c2)
+        dout1, dW1, db1 = affine_backward(dout2,c1)
+        
+        dW1 = dW1 + self.reg*W1
+        dW2 = dW2 + self.reg*W2
 
+        grads = {'W1':dW1,'b1':db1,'W2':dW2,'b2':db2}
+        
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
