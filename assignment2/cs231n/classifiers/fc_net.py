@@ -74,7 +74,25 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        dim_list = list()
+        dim_list.append(input_dim)
+
+        for i in hidden_dims:
+          dim_list.append(i)
+        
+        dim_list.append(num_classes)
+
+        #print(dim_list)
+
+        for i in range(len(dim_list)-1):
+          self.params['W'+str(i+1)] = np.random.normal(loc=0.0, scale=weight_scale, size=(dim_list[i],dim_list[i+1]))
+          self.params['b'+str(i+1)] = np.zeros(dim_list[i+1])
+
+        if(self.normalization == "batchnorm" or self.normalization == "layernorm"):
+          for i in range(0,len(hidden_dims)):
+            self.params["gamma" + str(i+1)] = np.ones((1, hidden_dims[i]))
+            self.params["beta" + str(i+1)] = np.zeros((1, hidden_dims[i]))
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -147,8 +165,57 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        
+        wb = self.params
+        
+        outs = list()
+        caches = list()
 
-        pass
+        outs.append(X)
+
+        
+
+        for i in range(0,self.num_layers-1):
+          if(self.normalization == "batchnorm"):
+            fwd = affine_bn_relu_forward(outs[i],wb['W'+str(i+1)],wb['b'+str(i+1)],wb['gamma'+str(i+1)],wb['beta'+str(i+1)],self.bn_params[i])
+            outs.append(fwd[0])
+            caches.append(fwd[1])
+            
+          elif(self.normalization == "layernorm"):
+            fwd = affine_ln_relu_forward(outs[i],wb['W'+str(i+1)],wb['b'+str(i+1)],wb['gamma'+str(i+1)],wb['beta'+str(i+1)],self.bn_params[i])
+            outs.append(fwd[0])
+            caches.append(fwd[1])
+          elif(self.use_dropout):
+            fwd = affine_relu_drop_forward(outs[i],wb['W'+str(i+1)],wb['b'+str(i+1)],self.dropout_param)
+            outs.append(fwd[0])
+            caches.append(fwd[1])
+          else:
+            fwd = affine_relu_forward(outs[i],wb['W'+str(i+1)],wb['b'+str(i+1)])
+            outs.append(fwd[0])
+            caches.append(fwd[1])
+            
+
+        aff = affine_forward(outs[-1],wb['W'+str(self.num_layers)],wb['b'+str(self.num_layers)])
+        outs.append(aff[0])
+        caches.append(aff[1])
+
+
+
+        # ######temporary start
+        # for L in range(self.num_layers - 1):
+            
+        #     W = self.params["W" + str(L + 1)]
+        #     b = self.params["b" + str(L + 1)]
+
+        #     if(L != 0):
+        #         scores, caches[L+1] = affine_relu_forward(scores, W, b)
+        #     else:
+        #         scores, caches[L + 1] = affine_relu_forward(X, W, b)
+
+        # ######temporary end
+        scores = outs[-1]
+        
+        
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -174,8 +241,80 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        
+        loss_tuple= softmax_loss(scores,y)
 
-        pass
+        loss = loss_tuple[0]
+
+        douts =list()
+        douts.append(loss_tuple[1])
+
+        dWs =list()
+        dbs = list()
+        dgammas =list()
+        dbetas = list()
+
+
+
+        for i in range(0,self.num_layers):
+             loss = loss + 0.5 * self.reg * np.sum(wb['W'+str(i+1)]*wb['W'+str(i+1)])
+
+        
+        aff_b = affine_backward(douts[0],caches[-1])
+
+        douts.append(aff_b[0])
+        dWs.append(aff_b[1])
+        dbs.append(aff_b[2])
+
+        for i in range(0,self.num_layers-1):
+          if(self.normalization=="batchnorm"):
+            bwd = affine_bn_relu_backward(douts[i+1],caches[-i-2])
+            douts.append(bwd[0])
+            dWs.append(bwd[1])
+            dbs.append(bwd[2])
+            dgammas.append(bwd[3])
+            dbetas.append(bwd[4])
+          elif(self.normalization=="layernorm"):
+            bwd = affine_ln_relu_backward(douts[i+1],caches[-i-2])
+            douts.append(bwd[0])
+            dWs.append(bwd[1])
+            dbs.append(bwd[2])
+            dgammas.append(bwd[3])
+            dbetas.append(bwd[4])
+          elif(self.use_dropout):
+            bwd = affine_relu_drop_backward(douts[i+1],caches[-i-2])
+            douts.append(bwd[0])
+            dWs.append(bwd[1])
+            dbs.append(bwd[2])
+          else:
+            bwd = affine_relu_backward(douts[i+1],caches[-i-2])
+            douts.append(bwd[0])
+            dWs.append(bwd[1])
+            dbs.append(bwd[2])
+          #print("here")
+
+       
+
+        # dWs.reverse()
+        # for i in range(0,self.num_layers):
+        #   dWs[i+1] = dWs[i+1] + self.reg*wb['W'+str(i+1)]
+        # dWs[2] = dWs[2] + self.reg*wb['W'+str(1)]
+        # dWs[1] = dWs[1] + self.reg*wb['W'+str(2)]
+        # dWs[0] = dWs[0] + self.reg*wb['W'+str(3)]
+       
+        for i in range(self.num_layers):
+
+          dWs[self.num_layers-(i+1)] = dWs[self.num_layers-(i+1)] + self.reg*wb['W'+str(i+1)]
+          grads['W'+str(i+1)] = dWs[-i-1]
+          grads['b'+str(i+1)] = dbs[-i-1]
+          
+        if(self.normalization == "batchnorm" or self.normalization == "layernorm"):
+          for i in range(self.num_layers-1):
+            grads['gamma'+str(i+1)] = dgammas[-i-1]
+            grads['beta'+str(i+1)] = dbetas[-i-1]
+
+
+        
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
