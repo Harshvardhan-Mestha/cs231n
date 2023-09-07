@@ -148,7 +148,57 @@ class CaptioningRNN:
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        #step1
+        h_init = affine_forward(features,W_proj,b_proj)
+        h0 = h_init[0]
+        c_init = h_init[1]
+        #print(h0.shape)
+
+        #step2
+        e = word_embedding_forward(captions_in,W_embed)
+        embeddings = e[0]
+        c_embedding = e[1]
+        #print(embeddings.shape)
+
+        #step3
+        h = 0
+        c_h = 0
+        if(self.cell_type=='rnn'):
+          fwd = rnn_forward(embeddings,h0,Wx,Wh,b)
+          h = fwd[0]
+          c_h = fwd[1]
+          #print(h.shape)
+        if(self.cell_type=='lstm'):
+          c0 = np.zeros((features.shape[0], Wh.shape[0]))
+          fwd = lstm_forward(embeddings,h0,Wx,Wh,b)
+          h = fwd[0]
+          c_h = fwd[1]
+          #print(h.shape)
+
+        #step4
+        fwd1 = temporal_affine_forward(h,W_vocab,b_vocab)
+
+        scores = fwd1[0]
+        c_scores = fwd1[1]
+        #print(scores.shape)
+
+        #step 5
+        loss,dout = temporal_softmax_loss(scores,captions_out,mask)
+
+        #backprop
+        if(self.cell_type=='rnn'):
+          dout_scores,grads['W_vocab'],grads['b_vocab'] = temporal_affine_backward(dout,c_scores)#s4
+          dout_h,dh0,grads['Wx'],grads['Wh'],grads['b'] = rnn_backward(dout_scores,c_h)#s3
+          grads['W_embed'] = word_embedding_backward(dout_h,c_embedding)#s2
+          x,grads['W_proj'],grads['b_proj'] = affine_backward(dh0,c_init)#s1
+
+        if(self.cell_type=='lstm'):
+          dout_scores,grads['W_vocab'],grads['b_vocab'] = temporal_affine_backward(dout,c_scores)#s4
+          dout_h,dh0,grads['Wx'],grads['Wh'],grads['b'] = lstm_backward(dout_scores,c_h)#s3
+          grads['W_embed'] = word_embedding_backward(dout_h,c_embedding)#s2
+          x,grads['W_proj'],grads['b_proj'] = affine_backward(dh0,c_init)#s1
+
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -216,7 +266,37 @@ class CaptioningRNN:
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        #step1
+        word = np.array([self._start for _ in range(N)])
+        e_word,w = word_embedding_forward(word,W_embed)
+
+        #step2
+        h_init = affine_forward(features,W_proj,b_proj)
+        h = h_init[0]
+
+        T = max_length
+        #step3
+        c = np.zeros((N, Wh.shape[0]))
+        
+        
+        if (self.cell_type=='rnn'):
+          for t in range(T):
+            h = rnn_step_forward(e_word, h, Wx, Wh, b)[0]
+            scores = affine_forward(h, W_vocab, b_vocab)[0]
+            captions[:, t] = np.argmax(scores, axis = 1)
+            word = captions[:, t]
+            token = word_embedding_forward(word, W_embed)[0]
+
+        if (self.cell_type=='lstm'):
+          for t in range(T):
+            h,c = lstm_step_forward(e_word, h, c, Wx, Wh, b)[0:2]
+            scores = affine_forward(h, W_vocab, b_vocab)[0]
+            captions[:, t] = np.argmax(scores, axis = 1)
+            word = captions[:, t]
+            token = word_embedding_forward(word, W_embed)[0]
+          
+
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################

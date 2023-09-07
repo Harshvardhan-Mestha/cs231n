@@ -34,7 +34,12 @@ def compute_saliency_maps(X, y, model):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #print(X.shape)
+    #print(y)
+    loss = model(X).gather(1, y.view(-1, 1)).squeeze().sum() 
+    #print(model(X).shape)
+    loss.backward()
+    saliency = torch.max((X.grad).abs(), dim=1)[0]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -75,8 +80,31 @@ def make_fooling_image(X, target_y, model):
     # You can print your progress over iterations to check your algorithm.       #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # scores = model(X_fooling)[0]
+    # trg_score =  torch.max(scores)
 
-    pass
+    # loss = scores[target_y]
+    # print("desired loss thresh:"+str(torch.max(scores)))
+    # print("current target class loss:"+str(scores[target_y]))
+
+
+    #we maximise loss fn(the score of the target class(stingray)). such that it is largest than the largest class score(correct predicted class - hay) else we wont be able to fool.
+    for i in range(100):
+      #print(i)
+      scores = model(X_fooling)[0]
+      trg_score =  torch.max(scores)
+
+      loss = scores[target_y]
+      loss.backward()
+
+      if(trg_score==target_y):
+        break
+        
+      X_fooling.data += learning_rate*X_fooling.grad/X_fooling.grad.norm()
+      X_fooling.grad = torch.zeros((X_fooling.shape)) 
+
+      #print(torch.max(y_pred))
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -93,9 +121,17 @@ def class_visualization_update_step(img, model, target_y, l2_reg, learning_rate)
     # Be very careful about the signs of elements in your code.            #
     ########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    scores = model(img)[0]
+    trg_score = scores[target_y]
 
-    pass
+    loss = trg_score - l2_reg * torch.sum(img*img)
+    loss.backward()
 
+    img.data += learning_rate*img.grad/img.grad.norm()
+    img.grad = torch.zeros((img.shape)) 
+
+
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ########################################################################
     #                             END OF YOUR CODE                         #

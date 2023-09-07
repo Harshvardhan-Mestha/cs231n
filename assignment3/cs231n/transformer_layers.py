@@ -38,7 +38,11 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        i = torch.arange(max_len)[:, None]
+        p = torch.pow(10000, -torch.arange(0, embed_dim, 2)/embed_dim)
+
+        pe[0, :, 0::2] = torch.sin(i*p)
+        pe[0, :, 1::2] = torch.cos(i*p)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -70,7 +74,7 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        output = self.dropout(x + self.pe[:, :S])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -164,8 +168,20 @@ class MultiHeadAttention(nn.Module):
         #     function masked_fill may come in handy.                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        H = self.n_head
 
-        pass
+       
+        K = self.key(key).view(N, T, H, E//H).moveaxis(1, 2)
+        Q = self.query(query).view(N, S, H, E//H).moveaxis(1, 2)
+        V = self.value(value).view(N, T, H, E//H).moveaxis(1, 2)
+        
+        Y = torch.matmul(Q,K.transpose(2,3))/((E/H)**0.5)
+
+        if attn_mask is not None:
+            Y = Y.masked_fill(attn_mask==0, float("-inf"))
+
+        Y = torch.matmul(self.attn_drop(F.softmax(Y,dim=-1)),V)
+        output = self.proj(Y.moveaxis(1, 2).reshape((N, S, E)))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
